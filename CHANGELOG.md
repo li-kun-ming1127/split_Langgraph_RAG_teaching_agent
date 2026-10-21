@@ -29,12 +29,31 @@ Dates use Asia/Shanghai. This log records verified facts, not assumed end-to-end
 - Push: confirmed — `git push -u origin chore/version-control-baseline` succeeded, tracking was configured, and a fresh remote query matched the published baseline hash. This resolves the VC-001 missing-remote blocker.
 - Ledger follow-up: this documentation-only commit records the already confirmed baseline publication. Its own hash and separate push result are reported at delivery and discoverable in Git history; no self-referential amendment is used.
 
+## 2026-10-21 — VC-003 — Consolidate long-term Git/GitHub management policy
+
+- Goal: integrate the user's current safety/branch/testing/recovery rules with the existing documents, using 《Git和GitHub管理代码的方式》 as reference material rather than executing its old-project examples.
+- Starting state: clean worktree on related branch `chore/version-control-baseline`, starting commit `34c17efae8974e22d6568c92235e0d66cc27e5e2`. `origin` matches the project URL. A fresh `git ls-remote --symref origin` matched that hash; no remote `main` or divergent history was present.
+- Visibility: GitHub repository metadata reported `public` on 2026-10-21. No explicit public-publication approval has been given for this task; no push or visibility change will be performed. Previously published commits remain remote/public.
+- Files/modules: only `AGENTS.md`, `README.md`, `.gitignore`, `CHANGELOG.md`; no business module, dependency, private data, model or index changes intended.
+- Changes: retain single-Agent/module/filename boundaries; add exact preflight checks, branch naming and latest-main rules, visibility/history/merge/tag gates, precise validation and state reporting. Preserve existing recovery guidance and prior log entries. Ignore tox/nox environments and Streamlit secret backup variants while retaining sanitized example support.
+- Tests: `git diff --check` passed; `git diff --stat`/`git diff --name-only` confirmed exactly four management files changed; `git ls-files -ci --exclude-standard` was empty. `git check-ignore --stdin -z` regression assertions passed for all 226 local credential/data/model/index files and the new tox/nox/secret-backup cases; `git check-ignore -q` confirmed source, dependency and sanitized-example exceptions. Python stdin checks with the existing Python 3.12 interpreter parsed all 9 tracked Python files, verified required policy clauses and scanned all 3 existing revisions plus the four edited files for known local secrets/selected credential patterns (no matches). PowerShell `Get-FileHash -Algorithm SHA256` confirmed all 8 existing top-level source files unchanged. These are heuristic security checks, not a dedicated scanner or formal guarantee.
+- Not run: application module imports and MCP/Redis/RAG/UI/model integration tests; this is a management-document-only task and runtime imports/calls can initialize services or require private credentials. DOCX rendering not run: only reference text was extracted, no Word artifact is edited or delivered.
+- Task commit: pending local validation/commit; its hash will be recorded in a ledger follow-up without rewriting existing history.
+- Status: local policy changes reviewed and validation passed; commit pending. Push blocked by Public visibility without explicit publication approval; not merged into `main`, no version tag or release created.
+- Known issues/next steps: obtain a decision on private visibility versus explicit public publication, then recheck all push gates. Establishing a tested stable `main` remains a separate decision; existing application integration defects are not fixed by this task.
+
 ## Entry template
 
 - Task ID / date:
+- Starting branch / commit:
 - Reason:
 - Files:
 - Changes:
-- Tests and explicit failures/limitations:
+- Exact test commands / actual results:
+- Not-run tests / reasons and explicit failures/limitations:
 - Task commit hash (or pending with reason):
 - Push destination/status (or blocked reason):
+- Merged into main / evidence or reason not merged:
+- Version tag / release status:
+- Worktree cleanliness:
+- Known issues / follow-up decisions:

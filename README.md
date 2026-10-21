@@ -23,6 +23,8 @@ Visual understanding is optional. The existing index uses OCR fallback; it does 
 
 Only Redis, `mcp_server.py` and the Streamlit app are separate running services. Do not run every module independently.
 
+Keep this single-Agent architecture and the module responsibilities above. Do not add multi-agent orchestration or `retriever.py` without an approved design task. Keep filenames stable; use Git commits/branches/tags rather than source copies named `v2`, `final` or dates. Temporary ignored backups before an authorized restore are a safety measure, not a second version-management system.
+
 ## Environment and secrets
 
 - Existing local Python: `D:\pycharm\langchain\LangChain_project\venv312\Scripts\python.exe` (Python 3.12). This path is machine-specific.
@@ -93,15 +95,61 @@ Follow `AGENTS.md`. Verify this repository root, branch, status, diffs, history 
 
 Stage explicit task paths, inspect `git diff --cached`, run relevant checks, update `CHANGELOG.md`, and commit a logically complete task. Record its hash in a small follow-up changelog commit; that ledger does not recursively record its own hash. Known baseline application defects must remain documented, not mislabeled as tests passing.
 
-No remote is assumed. After the user supplies and confirms the exact split-project GitHub URL, inspect its refs/history before adding a remote or uploading. Do not create a new remote repository or combine unrelated histories automatically. A private repository is not permission to upload secrets or course data.
+The confirmed `origin` is `https://github.com/li-kun-ming1127/split_Langgraph_RAG_teaching_agent.git`. Check its fetch and push URLs rather than assuming the current configuration is correct. Never replace an unexpected remote or reinitialize this existing repository. A private repository is not permission to upload secrets or course data.
 
-After remote confirmation and authorization, the later push command is:
+**Visibility gate:** before every push, read fresh GitHub repository metadata. Public repositories require explicit user approval for public publication; unknown visibility blocks pushing as well. Do not change visibility without authorization. As checked on 2026-10-21, this repository is **Public**; this management-policy task therefore remains local. The previously uploaded baseline is already public; withholding new pushes does not remove it or undo previous publication.
+
+At this check, the remote contains `chore/version-control-baseline` at `34c17ef` and uses it as its default branch; no `main` exists. This is a development recovery baseline, not a verified stable release. Do not create `main` just to satisfy a naming convention: first agree on and validate a stable baseline in a separate task.
+
+Only after visibility, history, security and test checks pass, the branch-specific push command is:
 
 ```text
 git push -u origin chore/version-control-baseline
 ```
 
 Run it only if `origin` and that branch have been verified. Never force push. If push fails, retain local commits and report the error. Branch protections and pull-request checks require separate server-side setup; local instructions do not enforce them.
+
+### Task checklist and branch lifecycle
+
+Before editing:
+
+```text
+git rev-parse --show-toplevel
+git status --short --branch
+git branch -vv
+git log --oneline --decorate -10
+git remote -v
+git diff
+git diff --cached
+```
+
+Identify existing edits and ownership before proceeding. Do not auto-stash, discard or mix unrelated edits into a task commit. Inspect fresh remote refs; fetching and inspecting is safer than an unconditional `pull` that may merge. Missing/unclear remote history or conflicts must be reported before a push or merge.
+
+`main` is the sole intended stable branch. Use `feat/<description>`, `fix/<description>`, `docs/<description>` or `chore/<description>`. Reuse a related development branch when appropriate. When starting a new task from `main`, first fetch/check the latest `origin/main` and create a clean task branch from that verified tip. Do not run those steps blindly when `main` is absent or local changes/history are unresolved.
+
+After editing, inspect the complete diff, run `git diff --check`, and select suitable syntax, safe import and focused functional checks. MCP/RAG/authentication/Redis/Agent/UI changes need relevant regression coverage. Assess services, credentials, downloads, costs and potential index rebuilds before testing. Mark omitted tests **未运行 / not run** and explain why; do not weaken permissions or alter tests to hide failures. Check for accidental changes to secrets/data/models/indexes/dependencies, circular imports, old-project path hardcoding and changed module boundaries.
+
+Use explicit staging and `git diff --cached --check`. Commit small complete tasks with `feat:`, `fix:`, `refactor:`, `perf:`, `test:`, `docs:` or `chore:`. Review all outgoing historical content, not just the worktree. Never weaken `.gitignore` or force-add private artifacts to simplify a commit.
+
+Push the verified development branch before a separately authorized stable merge. Before merging, synchronize and inspect the remote `main`, review differences, test integration and preserve both sides' valid work if conflicts occur. Incomplete tasks, failed tests or unresolved risks stay on a development branch. Do not force push, reset hard, clean files or delete valuable branches to resolve divergence.
+
+Only verified milestones receive an explicitly approved, unique tag such as `v1.0.0`, `v1.1.0` or `v1.1.1`. Never move existing tags. Tag pushes obey the same visibility/security gates and occur only when synchronization is requested.
+
+### Status reporting and source document
+
+`CHANGELOG.md` and the final report must distinguish these states:
+
+| State | Evidence |
+| --- | --- |
+| Completed | Task scope reviewed and relevant checks have explicit results |
+| Committed | Local commit hash exists |
+| Pushed | Fresh remote ref matches the intended commit |
+| Merged | Verified integration into `main`, not merely a development push |
+| Released | Explicit verified milestone/tag and, if applicable, actual GitHub Release; never inferred |
+
+Record date, objective, files/modules, behavior changes, exact tests/results, not-run tests/reasons, commit hashes, push/merge/tag statuses, worktree cleanliness and follow-up issues. For final handoff also identify the starting commit and current branch. Do not label syntax-only or documentation checks as a successful application test.
+
+These rules adapt the reference document 《Git和GitHub管理代码的方式》: stable main, task branches, small commits and milestone tags. Its old `ReAct_agent_loop_with_toolnode.py` filename and feature branch are examples from another project, not current instructions. Do not copy its blanket `git add .`, unconditional pull/merge, hard-reset or branch-deletion sequences; the current explicit safety rules take precedence. The reference DOCX is read-only source material and is not copied into this repository.
 
 ## What Git excludes and why
 

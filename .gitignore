@@ -6,6 +6,8 @@ venv/
 venv312/
 env/
 ENV/
+.tox/
+.nox/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -24,6 +26,8 @@ dist/
 !.env.example
 !*.env.example
 .streamlit/secrets.toml
+.streamlit/secrets.toml.*
+!.streamlit/secrets.toml.example
 *.pem
 *.key
 *.p12
@@ -52,6 +56,7 @@ Thumbs.db
 /docs/multivector/matplotlib_v2/
 
 # Raw datasets: keep local pending explicit ownership/upload approval
+# New data formats require manual review; ignore rules are not upload permission.
 /data/**/*.pdf
 /data/**/*.csv
 
