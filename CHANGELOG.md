@@ -17,6 +17,18 @@ Dates use Asia/Shanghai. This log records verified facts, not assumed end-to-end
 - Ledger follow-up: records this baseline hash without changing application code; its own hash is available from Git history and the delivery report rather than recursively embedded here.
 - Push: blocked — no user-confirmed project-specific GitHub URL. No remote configuration or upload authorized by inference.
 
+## 2026-10-21 — VC-002 — Connect verified GitHub remote and publish baseline
+
+- Reason: user supplied and explicitly approved the split-project GitHub destination and requested publication of the existing baseline.
+- Destination: `https://github.com/li-kun-ming1127/split_Langgraph_RAG_teaching_agent.git`, remote `origin`, branch `chore/version-control-baseline`.
+- Preflight: clean worktree, no prior remote, exact original two commits retained; `git ls-remote --symref` succeeded with no remote refs before the first push. No unrelated remote history was found.
+- Files: only `CHANGELOG.md` changes in this follow-up; remote configuration is local Git metadata. The published tree contains the 15 previously reviewed source/configuration/documentation/dependency files.
+- Security checks: scanned every file and commit message in both original revisions for known local credential values and selected API key, token, private-key and credential-URL patterns. No matches found. All on-disk env credentials, data files, model resources and generated index files are ignored; none appear in either historical tree. No ignored file is tracked. No dedicated secret scanner is installed, so this is a heuristic review, not an absolute security guarantee.
+- Tests: both diffs passed whitespace checks; all 9 Python files parsed in both revisions. No application runtime test or private-data model call was made. No business code, local credentials, PDFs, models or indexes were changed.
+- Published baseline: `e00e563861f5b6a72be359859ef7c041d71b15cb`, retaining ancestor `b5c5f0528a7929900f00e6abd893afe22ed77e85` without rewriting either commit.
+- Push: confirmed — `git push -u origin chore/version-control-baseline` succeeded, tracking was configured, and a fresh remote query matched the published baseline hash. This resolves the VC-001 missing-remote blocker.
+- Ledger follow-up: this documentation-only commit records the already confirmed baseline publication. Its own hash and separate push result are reported at delivery and discoverable in Git history; no self-referential amendment is used.
+
 ## Entry template
 
 - Task ID / date:
