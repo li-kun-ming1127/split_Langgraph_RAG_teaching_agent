@@ -1,0 +1,62 @@
+# Python artifacts and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+venv312/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Credentials: examples must contain no real values
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+.streamlit/secrets.toml
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local logs, temporary state and recovery copies
+*.log
+*.log.*
+*.tmp
+*.temp
+*.bak
+*.swp
+.cache/
+.local_backups/
+dump.rdb
+appendonly.aof*
+appendonlydir/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Reviewed local model resources; do not upload weights or vendor assets
+/embedding_models/
+
+# Generated private-document indexes, extracted assets and model responses
+/docs/multivector/matplotlib_v2/
+
+# Raw datasets: keep local pending explicit ownership/upload approval
+/data/**/*.pdf
+/data/**/*.csv
+
+# Machine-specific environment diagnostics; keep dependency snapshots available
+/environment_backup/**/pip-inspect.json
+/environment_backup/**/package-list.json
+/environment_backup/**/python-info.txt
+/environment_backup/**/pip-check.txt
