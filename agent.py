@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, TypedDict
+from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import (
     AIMessage,
@@ -37,9 +37,10 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, RunnableLambda
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from config import (
@@ -92,7 +93,7 @@ class AgentState(TypedDict, total=False):
         当前 Agent 实际允许调用的工具名称。
     """
 
-    messages: list[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
     turn_start: int
     step_count: int
     max_steps: int
@@ -605,13 +606,6 @@ def should_continue(
         )
     )
 
-    if step_count >= max_steps:
-        LOGGER.warning(
-            "Agent 达到最大执行步数：%d",
-            max_steps,
-        )
-        return END
-
     last_message = messages[-1]
 
     if isinstance(
@@ -619,6 +613,9 @@ def should_continue(
         AIMessage,
     ):
         if last_message.tool_calls:
+            if step_count >= max_steps:
+                LOGGER.warning("Agent 达到最大执行步数：%d", max_steps)
+                return END
             return "selected_tool_node"
 
     return END
@@ -703,6 +700,9 @@ def input_adapter(
     UI 不需要知道 AgentState 的内部结构。
     """
 
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("question 必须是非空字符串。")
+
     return {
         "messages": [
             HumanMessage(
@@ -728,41 +728,54 @@ def output_adapter(
     state: dict[str, Any],
 ) -> dict[str, Any]:
     """
-    将 LangGraph 内部 State 转换成 UI 所需的稳定输出结构。
+    映射本轮最终结果，并提供历史包装器需要写回的增量消息。
 
-    返回：
-
-        {
-            "answer": "...",
-            "retrieved_docs": [...],
-        }
+    _history_messages 仅供包装器使用，对外返回前移除；不重复写回历史
+    或当前 HumanMessage（后者由 RunnableWithMessageHistory 写入）。
     """
 
-    messages = state.get(
-        "messages",
-        []
+    messages = state.get("messages", [])
+    generated = list(messages[state.get("turn_start", 0) + 1:])
+    last_message = generated[-1] if generated else None
+    completed = (
+        isinstance(last_message, AIMessage)
+        and not last_message.tool_calls
+        and bool(last_message.content)
+        and bool(str(last_message.content).strip())
     )
-
-    answer = ""
-
-    # 从最后一个 AIMessage 中提取最终答案。
-    for message in reversed(messages):
-        if isinstance(
-            message,
-            AIMessage,
-        ):
-            if message.content:
-                answer = str(
-                    message.content
-                )
-                break
+    error = None
+    if completed:
+        answer = str(last_message.content)
+    else:
+        pending_calls = (
+            last_message.tool_calls if isinstance(last_message, AIMessage) else []
+        )
+        exhausted = bool(pending_calls) and state.get("step_count", 0) >= state.get(
+            "max_steps", MAX_AGENT_STEPS
+        )
+        error = "max_steps_exceeded" if exhausted else "no_final_answer"
+        answer = (
+            "本轮任务未完成：已达到最大执行步数，仍有工具调用未执行。请缩小问题范围后重试。"
+            if exhausted else "本轮任务未完成：未获得有效的最终回答，请重试。"
+        )
+        # 记录取消而非伪造工具成功，避免未配对调用污染后续轮次。
+        generated.extend(
+            ToolMessage(
+                content="工具调用未执行：本轮任务已结束。",
+                tool_call_id=call["id"],
+                name=call["name"],
+                status="error",
+            )
+            for call in pending_calls
+        )
+        generated.append(AIMessage(content=answer))
 
     return {
         "answer": answer,
-        "retrieved_docs": state.get(
-            "retrieved_docs",
-            [],
-        ),
+        "retrieved_docs": state.get("retrieved_docs", []),
+        "status": "completed" if completed else "incomplete",
+        "error": error,
+        "_history_messages": generated,
     }
 
 
@@ -799,16 +812,10 @@ def get_rag_chain_with_memory(
     session_context,
 ):
     """
-    对外提供与原 UI 兼容的 Agent Runnable。
+    对外接收 {"question": str}，返回 answer/retrieved_docs/status/error。
 
-    当前接口保持：
-
-        get_rag_chain_with_memory(session_context)
-
-    这样拆分后的 ReAct_agent_loop_with_toolnode.py
-    不需要直接操作 LangGraph 内部结构。
-
-    Redis 历史由 memory.py 管理。
+    历史通过独立 history 字段注入，再与当前问题合并进入图。
+    Redis 持久化仍由原历史包装器和 memory.py 管理。
     """
 
     session_id = (
@@ -824,12 +831,38 @@ def get_rag_chain_with_memory(
     )
 
     graph = get_agent_app().with_config(
-        configurable={"session_context": session_context},
+        configurable={
+            "session_context": session_context,
+            "session_id": session_id,
+            "user_id": user_id,
+            "knowledge_base_id": knowledge_base_id,
+        },
     )
+
+    def prepare_input(value: dict[str, Any]) -> dict[str, Any]:
+        # 在读取历史之前校验；复用既有适配器，不允许输入覆盖内部 State。
+        if not isinstance(value, dict):
+            raise ValueError("Agent 输入必须是包含 question 的字典。")
+        state = input_adapter(
+            value.get("question"),
+            session_id=session_id,
+            user_id=user_id,
+            knowledge_base_id=knowledge_base_id,
+        )
+        return {"question": value["question"], "_input_state": state}
+
+    def attach_history(value: dict[str, Any]) -> dict[str, Any]:
+        state = dict(value["_input_state"])
+        history = list(value["history"])
+        state["messages"] = history + state["messages"]
+        state["turn_start"] = len(history)
+        return state
 
     def get_history(
         _session_id: str,
     ):
+        if _session_id != session_id:
+            raise ValueError("session_id 与当前会话上下文不一致。")
         return get_session_history(
             session_id
         )
@@ -843,13 +876,20 @@ def get_rag_chain_with_memory(
     # -------------------------------------------------------------------------
 
     runnable = RunnableWithMessageHistory(
-        graph,
+        RunnableLambda(attach_history) | graph | RunnableLambda(output_adapter),
         get_history,
-        input_messages_key="messages",
-        history_messages_key="messages",
+        input_messages_key="question",
+        history_messages_key="history",
+        output_messages_key="_history_messages",
     )
 
-    return runnable
+    return (
+        RunnableLambda(prepare_input)
+        | runnable
+        | RunnableLambda(lambda result: {
+            key: value for key, value in result.items() if key != "_history_messages"
+        })
+    ).with_config(configurable={"session_id": session_id})
 
 
 # =============================================================================
@@ -894,14 +934,6 @@ def invoke_agent(
         session_context
     )
 
-    input_state = input_adapter(
-        question,
-        session_id=session_id,
-        user_id=user_id,
-        knowledge_base_id=knowledge_base_id,
-        user_role=user_role,
-    )
-
     config = {
         "configurable": {
             "session_id": session_id,
@@ -914,13 +946,9 @@ def invoke_agent(
     if callbacks:
         config["callbacks"] = callbacks
 
-    result = chain.invoke(
-        input_state,
+    return chain.invoke(
+        {"question": question},
         config=config,
-    )
-
-    return output_adapter(
-        result
     )
 
 

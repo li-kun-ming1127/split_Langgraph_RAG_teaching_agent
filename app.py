@@ -174,11 +174,12 @@ def process_user_prompt(prompt: str, session_context) -> None:
     with st.chat_message("assistant"):
         with st.spinner("思考中..."):
             monitor = AgentMonitorHandler()
+            result_status = None
             try:
-                # agent.py 提供已经组装好的 RunnableWithMessageHistory。
+                # 统一入口接收 question，内部负责历史注入和输入输出适配。
                 rag_chain = get_rag_chain_with_memory(session_context)
 
-                # MCP 工具是异步工具，因此整张链路使用 ainvoke。
+                # 保留异步调用入口；内部节点的执行方式由 agent.py 管理。
                 result = run_coroutine_sync(
                     rag_chain.ainvoke(
                         {"question": prompt},
@@ -195,6 +196,7 @@ def process_user_prompt(prompt: str, session_context) -> None:
                 )
 
                 answer = result["answer"]
+                result_status = result["status"]
                 st.session_state.last_retrieved_docs = result.get("retrieved_docs", [])
 
             except Exception as exc:
@@ -211,7 +213,10 @@ def process_user_prompt(prompt: str, session_context) -> None:
                 session_context.redis_session_id,
                 st.session_state.last_token_usage,
             )
-            st.write(answer)
+            if result_status == "incomplete":
+                st.warning(answer)
+            else:
+                st.write(answer)
 
     st.session_state.messages.append((prompt, answer))
 
