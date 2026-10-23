@@ -29,6 +29,7 @@ import logging
 import time
 from typing import Annotated, Any, TypedDict
 
+from langchain_core.documents import Document
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
@@ -221,7 +222,7 @@ def _extract_tool_result_content(result: Any) -> str:
     return serialize_tool_content(result)
 
 
-def _extract_retrieved_documents(tool_result: str) -> list[Any]:
+def _extract_retrieved_documents(tool_result: str) -> list[Document]:
     """
     从 search_matplotlib_knowledge 返回值中提取检索结果。
 
@@ -241,15 +242,37 @@ def _extract_retrieved_documents(tool_result: str) -> list[Any]:
     except (TypeError, json.JSONDecodeError):
         return []
 
-    if not isinstance(parsed, dict):
-        return []
+    # MCP adapters return text content blocks; cached results keep that shape.
+    payloads = []
+    if isinstance(parsed, dict):
+        payloads.append(parsed)
+    elif isinstance(parsed, list):
+        for block in parsed:
+            if not isinstance(block, dict) or block.get("type") != "text":
+                continue
+            try:
+                payloads.append(json.loads(block.get("text")))
+            except (TypeError, json.JSONDecodeError):
+                continue
 
-    results = parsed.get("results", [])
-
-    if not isinstance(results, list):
-        return []
-
-    return results
+    documents = []
+    for payload in payloads:
+        if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+            continue
+        for item in payload["results"]:
+            if not isinstance(item, dict) or not isinstance(item.get("content"), str):
+                continue
+            metadata = item.get("metadata")
+            if metadata is None:
+                metadata = {}
+            if not isinstance(metadata, dict):
+                continue
+            metadata = dict(metadata)
+            for key in ("type", "summary"):
+                if key not in metadata and isinstance(item.get(key), str):
+                    metadata[key] = item[key]
+            documents.append(Document(page_content=item["content"], metadata=metadata))
+    return documents
 
 
 # =============================================================================

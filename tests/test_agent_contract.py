@@ -315,6 +315,63 @@ class AgentContractTests(unittest.TestCase):
         st.write.assert_not_called()
         self.assertIn("未完成", st.session_state.messages[0][1])
 
+    def test_retrieval_payload_shapes(self):
+        from langchain_core.documents import Document
+        payload = {"results": [{"content": "synthetic course", "type": "text",
+                                "metadata": {"source": "course.pdf", "page": 0}}]}
+        encoded = json.dumps(payload)
+        blocks = [{"type": "text", "text": encoded}]
+        for value in [payload, encoded, blocks, ToolMessage(content=blocks, tool_call_id="c")]:
+            with self.subTest(value=type(value).__name__):
+                docs = self.agent._extract_retrieved_documents(
+                    self.agent._extract_tool_result_content(value))
+                self.assertEqual(len(docs), 1)
+                self.assertIsInstance(docs[0], Document)
+                self.assertEqual(docs[0].page_content, "synthetic course")
+                self.assertEqual(docs[0].metadata["page"], 0)
+
+    def test_retrieval_invalid_and_mixed_blocks(self):
+        valid = {"results": [None, {"content": 42}, {"content": "bad", "metadata": []},
+                              {"content": "valid", "metadata": None, "type": "image",
+                               "summary": "caption"}]}
+        blocks = [{"type": "image", "text": json.dumps(valid)},
+                  {"type": "text", "text": "not json"},
+                  {"type": "text", "text": json.dumps(valid)}]
+        docs = self.agent._extract_retrieved_documents(json.dumps(blocks))
+        self.assertEqual(len(docs), 1)
+        self.assertEqual(docs[0].page_content, "valid")
+        self.assertEqual(docs[0].metadata, {"type": "image", "summary": "caption"})
+        for value in ["", "plain error", "null", "[]", '{"results": null}',
+                      '{"results": {}}', '{"results": []}']:
+            with self.subTest(value=value):
+                self.assertEqual(self.agent._extract_retrieved_documents(value), [])
+
+    def test_retrieval_graph_cache_and_ui(self):
+        from unittest.mock import MagicMock
+        payload = {"results": [{"content": "course excerpt", "metadata": {
+            "source": "course.pdf", "page": 2, "type": "text"}}]}
+        blocks = [{"type": "text", "text": "retrieval notice"},
+                  {"type": "text", "text": json.dumps(payload)}]
+        async def tool_invoke(args, config=None):
+            return blocks
+        self.tool.ainvoke = Mock(side_effect=tool_invoke)
+        for cached in [False, True]:
+            with self.subTest(cached=cached):
+                self.dependencies["memory"].get_cached_tool_result.return_value = (
+                    json.dumps(blocks) if cached else None)
+                self.responses = [self.tool_request(), AIMessage(content="answer")]
+                ui, st = self.load_ui()
+                st.expander = MagicMock()
+                st.caption = Mock()
+                ui.process_user_prompt("source question", self.context)
+                ui.render_retrieved_documents(st.session_state.last_retrieved_docs)
+                st.expander.assert_called_once_with("片段 1（course.pdf 第 3 页）")
+                st.write.assert_any_call("course excerpt")
+                self.assert_paired(self.history(self.context.redis_session_id).messages)
+                tool_messages = [m for m in self.contexts[-1] if isinstance(m, ToolMessage)]
+                self.assertEqual(json.loads(tool_messages[-1].content), blocks)
+        self.tool.ainvoke.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

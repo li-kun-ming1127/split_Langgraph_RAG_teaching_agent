@@ -2,6 +2,17 @@
 
 Dates use Asia/Shanghai. This log records verified facts, not assumed end-to-end success.
 
+## 2026-10-23 — S1-B — Repair MCP retrieval and UI document contract
+
+- Baseline: clean `fix/s1-a-agent-contract`, HEAD `501ff24` (S1-A), matching local `origin/fix/s1-a-agent-contract`. User reports S1-A pushed. Live `git ls-remote origin refs/heads/fix/s1-a-agent-contract refs/heads/main` failed with DNS resolution failure; remote synchronization was not independently confirmed. Approved fetch/push URL remains `https://github.com/li-kun-ming1127/split_Langgraph_RAG_teaching_agent.git`.
+- Reason/change: MCP adapter text-block lists previously produced no sources; direct JSON produced dictionaries incompatible with UI Document access. `agent.py` now extracts JSON from text blocks and converts valid results to `Document`, retaining metadata and type/summary fallbacks. Invalid entries are skipped. Tool-message content and cache serialization remain unchanged; no duplicate UI adapter is introduced.
+- Files: `agent.py`, `tests/test_agent_contract.py`, `CHANGELOG.md`. Existing UI, roles, history, authentication, dependencies and private data are unchanged.
+- Regression: two new parser tests initially failed (five failing subcases); after repair both passed. Added three test methods cover dictionary/JSON/text-block/ToolMessage inputs, malformed and mixed blocks, empty results, cache hit/miss, real graph/history pairing and UI source rendering with mocked external services.
+- Test command: `& 'D:\pycharm\langchain\LangChain_project\venv312\Scripts\python.exe' -B -m unittest discover -s tests -v` — 21 tests passed outside the sandbox with the existing network guard enabled. In-sandbox execution stalled in Windows asyncio's internal socketpair accept; the initial run was interrupted, and a diagnostic run exited after a 40-second faulthandler timeout. This was not a business test assertion failure. The known RunnableWithMessageHistory deprecation warning remains.
+- Static checks: Python `ast.parse` and in-memory `compile` for `agent.py`, `app.py`, and `tests/test_agent_contract.py`; `git diff --check`, `git diff --cached --check`; complete diff/scope review. No dependencies installed or real services contacted. Secret/scope inspection is heuristic, not a dedicated security scan.
+- Not run: real Redis/MCP/model/PDF/index integration and browser end-to-end tests (outside this offline repair scope). Streamlit discovery script failed to launch its automatically selected interpreter; installed Streamlit 1.61.1 bundled guidance was read directly from the S1-A environment.
+- Delivery: local changes only, pending user review; no task commit, staging, push, main merge, tag or release. Next: review S1-B and separately authorize live integration or subsequent work; Checkpointer migration remains deferred.
+
 ## 2026-10-21 — VC-001 — Establish safe local version management
 
 - Reason: the split project had no Git repository, remote, history, ignore rules or recovery points.
